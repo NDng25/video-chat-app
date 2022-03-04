@@ -15,30 +15,39 @@ import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
+import javax.imageio.ImageIO;
+import javax.sound.sampled.LineUnavailableException;
 import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
 import javax.swing.JScrollPane;
-import java.awt.FlowLayout;
 import javax.swing.JButton;
-import javax.swing.JTextArea;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.awt.image.BufferedImage;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.List;
-import java.util.Scanner;
 import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.Image;
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
+import java.awt.Color;
 
 public class MainFrame extends JFrame {
 	private int idUser;
 	private Client client = null;
 	private ReadClient read;
 	private boolean isOnChat = false;
+	
+	private JTextField txtName;
+	private JScrollPane scrollPane;
+	private JButton btnNewButton;
+	private JLabel lblNewLabel;
 //	private WriteClient write;
 	public Client getClient() {
 		return client;
@@ -59,12 +68,12 @@ public class MainFrame extends JFrame {
 	public void setUsername(String s) {
 		this.username = s;
 	}
+	
+	public void welcomeMess(String msg) {
+		txtName.setText(msg);
+	}
 
-	private JTextField txtName;
-	private JScrollPane scrollPane;
-	private JComboBox cbbStatus;
-	private JButton btnNewButton;
-	private JLabel lblNewLabel;
+	
 
 	/**
 	 * Launch the application.
@@ -73,10 +82,48 @@ public class MainFrame extends JFrame {
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
+		            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
+		                if ("Nimbus".equals(info.getName())) {
+		                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
+		                    break;
+		                }
+		            }
+		        } catch (ClassNotFoundException ex) {
+		            java.util.logging.Logger.getLogger(MainFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+		        } catch (InstantiationException ex) {
+		            java.util.logging.Logger.getLogger(MainFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+		        } catch (IllegalAccessException ex) {
+		            java.util.logging.Logger.getLogger(MainFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+		        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
+		            java.util.logging.Logger.getLogger(MainFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+		        }
+				try {
 					MainFrame frame = new MainFrame(1);
 					frame.setVisible(true);
-					Object result = JOptionPane.showInputDialog(frame, "Enter printer name:");
-					frame.setUsername((String)result);
+					Object result = "";
+					while(true) {
+						result = JOptionPane.showInputDialog(frame, "Please type your name","Welcome",JOptionPane.QUESTION_MESSAGE);
+						if((String)result==null){ System.exit(0);}
+						if(((String)result).isEmpty()) {
+						continue;
+						}
+						break;
+						}
+					frame.setUsername(((String)result));
+					frame.welcomeMess("Chao "+ ((String)result)+"!");
+					frame.addWindowListener(new WindowAdapter() {
+						@Override
+						public void windowClosing(WindowEvent e) {
+							int result = JOptionPane.showConfirmDialog(frame,
+						            "Are you sure you want to close this window?", "Close Window?", 
+						            JOptionPane.YES_NO_OPTION,
+						            JOptionPane.QUESTION_MESSAGE);
+							if ((result == JOptionPane.YES_OPTION)){
+									frame.close();
+						            System.exit(0);
+						    }
+						}
+					});
 					Client client = new Client((String)result);
 					frame.setClient(client);
 					DataOutputStream dout = new DataOutputStream(client.getOut());
@@ -89,17 +136,29 @@ public class MainFrame extends JFrame {
 		});
 		
 	}
-
+	public BufferedImage Background(String url)
+	{
+		BufferedImage img = null;
+		try {
+			String localDir = System.getProperty("user.dir");
+		    img = ImageIO.read(new File(localDir+"\\src\\images\\"+url));
+		    Image tmp =img.getScaledInstance( 108, 95, Image.SCALE_SMOOTH);
+		    BufferedImage dimg = new BufferedImage( 108, 95, BufferedImage.TYPE_INT_ARGB);
+		    Graphics2D g2d = dimg.createGraphics();
+		    g2d.drawImage(tmp, 0, 0, null);
+		    g2d.dispose();
+		    return dimg;
+		    
+		} catch (IOException e) 
+		{
+			e.printStackTrace();
+		}
+		return null;
+	}
 	/**
 	 * Create the frame.
 	 */
 	public MainFrame(int idUser) {
-		addWindowListener(new WindowAdapter() {
-			@Override
-			public void windowClosing(WindowEvent e) {
-				
-			}
-		});
 		initialize();
 	}
 	
@@ -107,29 +166,27 @@ public class MainFrame extends JFrame {
 		model.addElement("hihi");
 		this.idUser = idUser;
 		setBounds(100, 100, 558, 573);
-		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 		
 		JPanel panel = new JPanel();
 		getContentPane().add(panel, BorderLayout.CENTER);
 		panel.setLayout(null);
 		
 		JPanel panel_info = new JPanel();
-		panel_info.setBackground(UIManager.getColor("info"));
+		panel_info.setBackground(Color.PINK);
 		panel_info.setBounds(10, 10, 524, 116);
 		panel.add(panel_info);
 		panel_info.setLayout(null);
 		
 		txtName = new JTextField();
-		txtName.setBounds(133, 10, 314, 28);
+		txtName.setEditable(false);
+		txtName.setFont(new Font("Tahoma", Font.BOLD | Font.ITALIC, 15));
+		txtName.setBounds(128, 40, 252, 28);
 		panel_info.add(txtName);
 		txtName.setColumns(10);
 		
-		cbbStatus = new JComboBox();
-		cbbStatus.setBounds(133, 62, 115, 28);
-		panel_info.add(cbbStatus);
-		
 		lblNewLabel = new JLabel("");
-		lblNewLabel.setIcon(new ImageIcon("C:\\Users\\Admin\\Pictures\\t\u1EA3i xu\u1ED1ng.jfif"));
+		lblNewLabel.setIcon(new ImageIcon(Background("user.png")));
 		lblNewLabel.setBounds(10, 10, 108, 95);
 		panel_info.add(lblNewLabel);
 		
@@ -140,7 +197,6 @@ public class MainFrame extends JFrame {
 				boolean isAccept = false;
 				System.out.println(receiver);
 				//send message request to server
-				
 				read.newChat(receiver);
 				System.out.println(isAccept);
 				
@@ -163,7 +219,7 @@ public class MainFrame extends JFrame {
 			}
 		});
 		btnNewButton.setFont(new Font("Tahoma", Font.BOLD, 15));
-		btnNewButton.setBounds(406, 47, 108, 58);
+		btnNewButton.setBounds(406, 40, 108, 28);
 		panel_info.add(btnNewButton);
 		
 		JLabel lblNewLabel_1 = new JLabel("Danh s\u00E1ch b\u1EA1n b\u00E8");
@@ -181,7 +237,9 @@ public class MainFrame extends JFrame {
 	}
 	
 	public boolean showConfirmPanel(String msg) {
-		return JOptionPane.showConfirmDialog(this, msg) == JOptionPane.YES_OPTION;
+		int dialogResult = JOptionPane.showConfirmDialog 
+				(this, msg);
+		return (dialogResult == JOptionPane.YES_OPTION);
 	}
 	
 	public static void resetFriendList() {
@@ -198,24 +256,15 @@ public class MainFrame extends JFrame {
 	public void execute() throws IOException {
 		this.read = new ReadClient(client.getSocket());
 		this.read.start();
-//		write = new WriteClient(this.username, client.getSocket());
-//		write.start();
 	}
 	
-	public void stop() {
-		try {
-			this.read.wait();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
-	
+	@SuppressWarnings("deprecation")
 	public void close() {
-		read.interrupt();
-//		write.interrupt();
 		try {
+			Object obj = null;
+			new ObjectOutputStream(client.getOut()).writeObject(obj);
 			client.getSocket().close();
+			this.read.stop();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -230,7 +279,7 @@ public class MainFrame extends JFrame {
 			this.socket = socket;
 		}
 		
-		public void newChat(String receiver) {
+		public synchronized void newChat(String receiver) {
 			try {
 				System.out.println("New chat");
 				ObjectOutputStream out = new ObjectOutputStream(getClient().getOut());
@@ -244,12 +293,21 @@ public class MainFrame extends JFrame {
 			
 		}
 		
+		public synchronized void close() {
+			try {
+				socket.close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
 		@Override
 		public void run() {
 			ObjectInputStream ins = null;
 			System.out.println("luong doc dang chay");
 			try {
-				while(true) {
+				while(!socket.isClosed()) {
 					ins = new ObjectInputStream(socket.getInputStream());
 					Object o = ins.readObject();
 					if(o instanceof Request) {
@@ -263,9 +321,8 @@ public class MainFrame extends JFrame {
 							System.out.println("Nhan request new chat");
 							String name = ((Message)o).getName();
 							boolean option = showConfirmPanel(name+" muon bat dau chat!");
-							System.out.println("comfirm here");
+							System.out.println("comfirm here: "+option);
 							if(option) {
-								
 								new Thread(new Runnable() {
 									
 									@Override
@@ -281,21 +338,39 @@ public class MainFrame extends JFrame {
 										} catch (IOException e) {
 											// TODO Auto-generated catch block
 											e.printStackTrace();
+										} catch (LineUnavailableException e) {
+											// TODO Auto-generated catch block
+											e.printStackTrace();
 										}
 									}
 								}).start();
-								
 							}
 						}
 						else if(((Message)o).getMessage().equals("Accept!")) {
 							showConfirmPanel("Da ket noi voi: "+((Message)o).getName());
+							try {
+					            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
+					                if ("Nimbus".equals(info.getName())) {
+					                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
+					                    break;
+					                }
+					            }
+					        } catch (ClassNotFoundException ex) {
+					            java.util.logging.Logger.getLogger(ChatRoom.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+					        } catch (InstantiationException ex) {
+					            java.util.logging.Logger.getLogger(ChatRoom.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+					        } catch (IllegalAccessException ex) {
+					            java.util.logging.Logger.getLogger(ChatRoom.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+					        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
+					            java.util.logging.Logger.getLogger(ChatRoom.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+					        }
 							ChatRoom c = new ChatRoom(client.getUsername(), ((Message)o).getName());
 							c.setVisible(true);
 							isOnChat = true;
 						}
 					}
 				}
-			} catch (IOException e) {
+			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 				try {
@@ -304,10 +379,7 @@ public class MainFrame extends JFrame {
 					// TODO Auto-generated catch block
 					e1.printStackTrace();
 				}
-			} catch (ClassNotFoundException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			} 
 		}
 		
 		public void updateFriend(List<String> listUser) {
@@ -318,40 +390,6 @@ public class MainFrame extends JFrame {
 				}
 			}
 		}
-	}
 	
-//	class WriteClient extends Thread{
-//		private Socket socket;
-//		private String username;
-//		public WriteClient(String username, Socket socket) throws IOException {
-//			this.socket = socket;
-//			this.username = username;
-//		}
-//		
-//		@Override
-//		public void run() {
-//			ObjectOutputStream outs = null;
-//			try {
-//				Scanner sc = new Scanner(System.in);
-//				while(true) {
-//					outs = new ObjectOutputStream(socket.getOutputStream());
-//					String msg = sc.nextLine();
-//					Message m = new Message(0,username,msg);
-//					outs.writeObject(m);
-//					sc.reset();
-//				}
-//			} catch (IOException e) {
-//				// TODO Auto-generated catch block
-//				e.printStackTrace(); 
-//				try {
-//					outs.close();
-//					socket.close();
-//				} catch (IOException e1) {
-//					// TODO Auto-generated catch block
-//					e1.printStackTrace();
-//				}
-//			}
-//			
-//		}
-//	}
+	}
 }

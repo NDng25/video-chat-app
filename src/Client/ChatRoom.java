@@ -1,7 +1,6 @@
 package Client;
 
 import java.awt.BorderLayout;
-import java.awt.EventQueue;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -9,34 +8,49 @@ import javax.swing.JScrollPane;
 import javax.swing.border.EmptyBorder;
 import javax.swing.text.html.HTMLDocument;
 import javax.swing.text.html.HTMLEditorKit;
-import javax.swing.text.html.StyleSheet;
 
-import DTO.Message;
+import DTO.*;
+
 
 import javax.swing.JTextField;
+import javax.imageio.ImageIO;
+import javax.sound.sampled.LineUnavailableException;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import java.awt.Font;
+import java.awt.Graphics2D;
 import java.awt.Color;
-import javax.swing.JTextArea;
-import javax.swing.JEditorPane;
+import java.awt.Dimension;
 import java.awt.event.ActionListener;
-import java.io.DataInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.awt.event.ActionEvent;
 import javax.swing.border.BevelBorder;
 import javax.swing.JTextPane;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+
 import java.awt.GridLayout;
+import java.awt.Image;
+import java.awt.Rectangle;
+import java.awt.Robot;
+import java.awt.Toolkit;
+
 import javax.swing.SwingConstants;
 import javax.swing.border.SoftBevelBorder;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.awt.image.BufferedImage;
 
 public class ChatRoom extends JFrame {
 
@@ -49,25 +63,59 @@ public class ChatRoom extends JFrame {
 	private JPanel chatbox_panel;
 	private static JTextPane textPane;
 	private ChatClient chat;
+	private Thread chatThread = null;
 	private String username;
 	private String peer;
-	
-
+	public static JLabel img_server;
+	public static JLabel img_client;
+	private boolean Send=false;
+	private JButton btnReceive;
+	private JButton btnShareScreen;
+	private Socket soc;
 	/**
 	 * Create the frame.
+	 * @throws LineUnavailableException 
+	 * @throws UnknownHostException 
+	 * @throws SocketException 
 	 */
-	public ChatRoom(String username, String peer) {
+	public ChatRoom(String username, String peer) throws SocketException, UnknownHostException, LineUnavailableException {
+		addWindowListener(new WindowAdapter() {
+			@Override
+			public void windowClosed(WindowEvent e) {
+				close();
+			}
+		});
 		this.username = username;
 		this.peer = peer;
 		
 		initialize();
 		this.setTitle(username);
 		this.chat = new ChatClient(username,peer);
-		new Thread(chat).start();
+		chatThread = new Thread(chat);
+		chatThread.start();
+		new ClientVideo(chat.udp_socket, username, peer).StartReceiveVideo(true);
 	}
-	
+	public BufferedImage Background(String url)
+	{
+		BufferedImage img = null;
+		try {
+			String localDir = System.getProperty("user.dir");
+		    img = ImageIO.read(new File(localDir+"\\src\\images\\"+url));
+		    Image tmp =img.getScaledInstance( 40,40, Image.SCALE_SMOOTH);
+		    BufferedImage dimg = new BufferedImage( 40, 40, BufferedImage.TYPE_INT_ARGB);
+		    Graphics2D g2d = dimg.createGraphics();
+		    g2d.drawImage(tmp, 0, 0, null);
+		    g2d.dispose();
+		    return dimg;
+		    
+		} catch (IOException e) 
+		{
+			e.printStackTrace();
+		}
+		return null;
+	}
 	private void initialize() {
-		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 		setBounds(100, 100, 1197, 740);
 		contentPane = new JPanel();
 		contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
@@ -80,18 +128,160 @@ public class ChatRoom extends JFrame {
 		
 		JPanel video_panel = new JPanel();
 		video_panel.setBorder(new BevelBorder(BevelBorder.RAISED, null, null, null, null));
-		video_panel.setBounds(10, 144, 805, 539);
+		video_panel.setBounds(10, 165, 805, 518);
 		panel.add(video_panel);
+		video_panel.setLayout(null);
+		
+		img_server = new JLabel("");
+		img_server.setBounds(10, 10, 785, 498);
+		video_panel.add(img_server);
 		
 		JPanel user_panel = new JPanel();
 		user_panel.setBorder(new BevelBorder(BevelBorder.RAISED, null, null, null, null));
-		user_panel.setBounds(10, 10, 550, 121);
+		user_panel.setBounds(10, 10, 550, 145);
 		panel.add(user_panel);
-		user_panel.setLayout(new GridLayout(1, 3, 0, 0));
+		user_panel.setLayout(null);
 		
-		JLabel lblNewLabel_1 = new JLabel("");
-		lblNewLabel_1.setHorizontalAlignment(SwingConstants.CENTER);
-		user_panel.add(lblNewLabel_1);
+		JButton btn_Video_voice = new JButton("Video Call");
+		btn_Video_voice.setBounds(43, 23, 108, 21);
+		user_panel.add(btn_Video_voice);
+		
+		JButton btnCancel = new JButton("Cancel");
+		btnCancel.setEnabled(false);
+		btnCancel.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				ClientVideo.checkSend=false;
+                btnCancel.setEnabled(false);
+				btn_Video_voice.setEnabled(true);
+			}
+		});
+		btnCancel.setBounds(43, 79, 108, 21);
+		user_panel.add(btnCancel);
+		
+		btnShareScreen = new JButton("Share Screen");
+		btnShareScreen.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				if(Send!=true)
+				{
+					Send=true;
+					btnShareScreen.setText("Stop Screen");
+					//						Home h1=new Home();
+					  new Thread(new Runnable() {
+					        @Override
+					        public void run() {
+					          try {
+					                Robot rob = new Robot();
+					                Dimension d = Toolkit.getDefaultToolkit().getScreenSize();
+									soc = new Socket(NameServer.getServerAddress(), 7749);	
+									DataOutputStream dout = new DataOutputStream(soc.getOutputStream());
+							    	
+							    	dout.writeBoolean(true);
+							    	dout.writeUTF(username); 
+					                while (Send) {
+					                	
+					                	System.out.print("1111");
+					                	 try {
+
+					                        BufferedImage img = rob.createScreenCapture(new Rectangle(0, 0, (int) d.getWidth(), (int) d.getHeight()));
+
+					                        ByteArrayOutputStream ous = new ByteArrayOutputStream();
+					                        ImageIO.write(img, "png", ous);
+					                        if(img==null){
+					                        	System.out.print("khon");
+					                        }
+					            			System.out.print("Started!!!");
+					            			new Thread(new Runnable() {
+					            				@Override
+										        public void run() {
+					            			try {
+												DataOutputStream dOut = new DataOutputStream(soc.getOutputStream());
+												dOut.writeInt(ous.toByteArray().length);
+												Thread.sleep(10);
+												dOut.write(ous.toByteArray());
+												dOut.flush();
+											} catch (IOException | InterruptedException e) {
+												// TODO Auto-generated catch block
+												e.printStackTrace();
+											}
+					            				}
+					            			}).start();
+					            			System.out.println("Started222!!!");
+					                        Thread.sleep(500);
+			
+					                        }
+					                	 catch (Exception e) {
+					                		 e.printStackTrace();
+					                	 }
+					                	 System.out.print("Started4444!!!");
+					                }
+					                
+					            } catch (Exception e) { 
+					            	e.printStackTrace();
+					           
+//				                        JOptionPane.showMessageDialog(null, e);
+					            }
+					            Send = false;
+
+					        }
+					    }).start();
+					
+				}
+				else {
+					btnShareScreen.setText("Share Screen");
+					Send=false;
+				}
+			}
+		});
+		btnShareScreen.setBounds(280, 23, 117, 21);
+		user_panel.add(btnShareScreen);
+		
+		btnReceive = new JButton("Receive");
+		btnReceive.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				 try {
+			            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
+			                if ("Nimbus".equals(info.getName())) {
+			                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
+			                    break;
+			                }
+			            }
+			        } catch (ClassNotFoundException ex) {
+			            java.util.logging.Logger.getLogger(Home.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+			        } catch (InstantiationException ex) {
+			            java.util.logging.Logger.getLogger(Home.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+			        } catch (IllegalAccessException ex) {
+			            java.util.logging.Logger.getLogger(Home.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+			        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
+			            java.util.logging.Logger.getLogger(Home.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+			        }
+				 
+				java.awt.EventQueue.invokeLater(new Runnable() {
+		            public void run() {
+		                try {
+							new Home(false,peer).setVisible(true);
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+		            }
+		        });
+				
+			}
+		});
+		btnReceive.setBounds(280, 79, 117, 21);
+		user_panel.add(btnReceive);
+		btn_Video_voice.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				try {
+					new ClientVideo(chat.udp_socket, username, peer).StartSendVideo(true);
+					btnCancel.setEnabled(true);
+					btn_Video_voice.setEnabled(false);
+				} catch (Exception ex) {
+					// TODO Auto-generated catch block
+					ex.printStackTrace();
+				}
+			}
+		});
 		
 		chatbox_panel = new JPanel();
 		chatbox_panel.setBorder(new BevelBorder(BevelBorder.RAISED, null, null, null, null));
@@ -107,23 +297,25 @@ public class ChatRoom extends JFrame {
 		JButton btnSend = new JButton("");
 		btnSend.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				String msg = textField.getText();
-				Message m = new Message(username,peer, msg);
-				try {
-					chat.sendMessage(m);
-					textField.setText("");
-					updateChat_send(msg);
-				} catch (IOException e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
+				String msg = textField.getText().trim();
+				if(!msg.equals("")) {
+					Message m = new Message(username,peer, msg);
+					try {
+						chat.sendMessage(m);
+						textField.setText("");
+						updateChat_send(msg);
+					} catch (IOException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
+					}
 				}
 			}
 		});
-		btnSend.setBackground(Color.GRAY);
+		btnSend.setBackground(Color.WHITE);
 		btnSend.setFont(new Font("Tahoma", Font.BOLD, 18));
 		btnSend.setBounds(263, 618, 65, 44);
 		chatbox_panel.add(btnSend);
-		
+		btnSend.setIcon(new ImageIcon(Background("send.png")));
 		JScrollPane scrollPane = new JScrollPane();
 		scrollPane.setBounds(10, 10, 318, 598);
 		chatbox_panel.add(scrollPane);
@@ -135,8 +327,13 @@ public class ChatRoom extends JFrame {
 		
 		JPanel panel_1 = new JPanel();
 		panel_1.setBorder(new SoftBevelBorder(BevelBorder.RAISED, null, null, null, null));
-		panel_1.setBounds(570, 10, 239, 121);
+		panel_1.setBounds(570, 10, 239, 145);
 		panel.add(panel_1);
+		panel_1.setLayout(null);
+		
+		img_client = new JLabel("");
+		img_client.setBounds(10, 10, 219, 129);
+		panel_1.add(img_client);
 	}
 	
 	public static void updateChat_receive(String sender,String msg) {
@@ -161,6 +358,20 @@ public class ChatRoom extends JFrame {
 				+ "</table>");
 	}
 	
+	@SuppressWarnings("deprecation")
+	public void close() {
+		try {
+			Disconnect obj = new Disconnect(username, peer);
+			new ObjectOutputStream(chat.socket.getOutputStream()).writeObject(obj);
+			ClientVideo.checkSend=false;
+			chat.socket.close();
+			chatThread.stop();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
 	// send html to pane
 	public static void appendToPane(JTextPane tp, String msg){
 		  HTMLDocument doc = (HTMLDocument)tp.getDocument();
@@ -175,8 +386,17 @@ public class ChatRoom extends JFrame {
 		    }
 	}
 	
+	public void showConfirmPanel(String msg) {
+		int dialogResult = JOptionPane.showConfirmDialog 
+				(this, msg);
+	}
+	
+	public void closeWindow() {
+		this.setVisible(false);
+		this.close();
+	}
+	
 	class ChatClient implements Runnable{
-		private final String address = "localhost";
 		private final int port = 9999;
 		
 		String username;
@@ -188,11 +408,12 @@ public class ChatRoom extends JFrame {
 			this.username = username;
 			this.peer = peer;
 			try {
-				this.socket = new Socket(InetAddress.getByName(address),port);
+				this.socket = new Socket(NameServer.getServerAddress(),port);
 				this.udp_socket = new DatagramSocket();
 				DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 				out.writeUTF(username);
-				DatagramPacket packet =  new DatagramPacket(new byte[1], 1, InetAddress.getByName(address),6969);
+				MessageUDP sMessage=new MessageUDP(this.username,"",new byte[1],new byte[1]);		
+				DatagramPacket packet =  new DatagramPacket( Convert.serialize(sMessage), Convert.serialize(sMessage).length,NameServer.getServerAddress(),6789);
 				this.udp_socket.send(packet);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
@@ -205,17 +426,26 @@ public class ChatRoom extends JFrame {
 			System.out.println("Chat client is running");
 			// TODO Auto-generated method stub
 			ObjectInputStream read = null;
-			while(true) {
+			while(!socket.isClosed()) {
 				try {
 					read = new ObjectInputStream(this.socket.getInputStream());
 					Object obj = read.readObject();
+					if(obj instanceof BroadcastMessage) {
+						if(((BroadcastMessage)obj).getName().equals(peer)) {
+							System.out.println("get duoc broadcast");
+							showConfirmPanel(peer+ " da ngat ket noi!");
+							closeWindow();
+							close();
+							break;
+						}
+					}
 					if(obj instanceof Message) {
 						System.out.println("received a message: "+ ((Message)obj).getMessage());
 						String msg = ((Message)obj).getMessage();
 						String sender = ((Message)obj).getName();
 						updateChat_receive(sender, msg);
 					}
-					read.reset();
+					//read.reset();
 				} catch (IOException | ClassNotFoundException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();

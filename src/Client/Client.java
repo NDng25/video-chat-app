@@ -18,14 +18,17 @@ import java.util.Scanner;
 import javax.swing.JOptionPane;
 
 import DTO.Message;
+import DTO.NameServer;
 import DTO.Request;
 
 public class Client {
 	private Socket socket;
 	private DataOutputStream out;
 	private DataInputStream in;
-//	private ReadClient read;
 	private String username;
+	private int port = 7050;
+	private String address = "localhost";
+	
 	public String getUsername() {
 		return username;
 	}
@@ -54,22 +57,6 @@ public class Client {
 		this.in = in;
 	}
 
-//	public ReadClient getRead() {
-//		return read;
-//	}
-//
-//	public void setRead(ReadClient read) {
-//		this.read = read;
-//	}
-//
-//	public WriteClient getWrite() {
-//		return write;
-//	}
-//
-//	public void setWrite(WriteClient write) {
-//		this.write = write;
-//	}
-
 	public int getPort() {
 		return port;
 	}
@@ -85,17 +72,11 @@ public class Client {
 	public void setAddress(String address) {
 		this.address = address;
 	}
-
-//	private WriteClient write;
-	private List<String> userList;
-	private int port = 7050;
-	private String address = "localhost";
 	
 	public Client(String username) throws InterruptedException {
 		this.username = username;
-		this.userList = new ArrayList<String>();
 		try {
-			this.socket = new Socket(InetAddress.getByName(address),port);
+			this.socket = new Socket(NameServer.getServerAddress(),port);
 			this.out = new DataOutputStream(socket.getOutputStream());
 			this.in = new DataInputStream(socket.getInputStream());
 			System.out.println(address + " "+port);
@@ -138,22 +119,6 @@ public class Client {
 			}
 		}
 	}
-//	public static void main(String args[]) {
-//		Scanner sc = new Scanner(System.in);
-//		System.out.println("Nhap ten");
-//		String name = sc.nextLine();
-//		try {
-//			Client client = new Client(name);
-//			client.execute();
-//		} catch (InterruptedException | IOException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
-//	}
-	
-	
-
-
 }
 
 

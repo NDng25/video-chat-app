@@ -16,13 +16,17 @@ import DTO.Message;
 import DTO.Request;
 
 public class Server extends Thread{
+	private final int timeOut = 5000;
+	
 	private ServerSocket server;
 	private int port;
 	public List<User> clientList;
+	Thread updateActive = null;
 	
 	public Server(int port) {
 		this.clientList = new ArrayList<>();
 		this.port = port;
+//		new ServerS2();
 	}
 	
 	@Override
@@ -37,12 +41,27 @@ public class Server extends Thread{
 				System.out.println("Da ket noi voi "+socket);
 				DataInputStream din = new DataInputStream(socket.getInputStream());
 				String username = din.readUTF();
-				
 				User u = new User(socket,username,port);
 				System.out.println("Ten: "+ username);
 				clientList.add(u);
 				sendActiveUser();
 				new Handler(u).start();
+				//Gui danh sach hoat dong moi khoang thoi gian = timeOut
+				updateActive = new Thread(new Runnable() {
+					@Override
+					public void run() {
+						while(true) {
+							try {
+								Thread.sleep(timeOut);
+							} catch (InterruptedException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+							sendActiveUser();
+						}
+					}
+				});
+				updateActive.start();
 			}
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -86,6 +105,17 @@ public class Server extends Thread{
 			}
 		}
 	}
+	
+	@SuppressWarnings("deprecation")
+	public void closeSocket(User u) {
+		try {
+			u.getSocket().close();
+			updateActive.stop();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 	class Handler extends Thread{
 		private User user;
 		
@@ -99,10 +129,17 @@ public class Server extends Thread{
 			System.out.println("Handler is running!");
 			try {
 				//ins = new ObjectInputStream(socket.getInputStream());
-				while(true) {
+				while(!user.getSocket().isClosed()) {
+					// check for client disconnection
 					ins = new ObjectInputStream(user.getIn());
 					Object obj = ins.readObject();
-					if(obj instanceof Message) {
+					if(obj == null) {
+						System.out.println(user.getUsername()+" disconnect!");
+						clientList.remove(user);
+						closeSocket(user);
+						break;
+					}
+					else if(obj instanceof Message) {
 						System.out.println("server nhan: "+((Message)obj).getMessage());
 						for(User item : clientList) {
 							if(item.getUsername().equals(((Message)obj).getReceiver())) {
@@ -119,6 +156,7 @@ public class Server extends Thread{
 			}
 		}
 	}
+	
 }
 
 class User {
@@ -149,5 +187,34 @@ class User {
 	public int getPort_UDP() {
 		return Port_UDP;
 	}
+	public void setPort_UDP(int port_UDP) {
+		Port_UDP = port_UDP;
+	}
 }
 
+//new Thread(new Runnable() {
+//	@Override
+//	public void run() {
+//		while(!user.getSocket().isClosed()) {
+//			try {
+//				Thread.sleep(timeOut);
+//			} catch (InterruptedException e) {
+//				// TODO Auto-generated catch block
+//				e.printStackTrace();
+//			}
+//			try {
+//				user.getOut().write(1);
+//			} catch (IOException e) {
+//				// TODO Auto-generated catch block
+//				System.out.println(user.getUsername()+" was disconnected!");
+//				clientList.remove(user);
+//				try {
+//					user.getSocket().close();
+//				} catch (IOException e1) {
+//					// TODO Auto-generated catch block
+//					e1.printStackTrace();
+//				}
+//			}
+//		}
+//	}
+//}).start();
